@@ -2,46 +2,78 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { initDB, getCourses, getTeachers, getSubjects, getSubjectTimeSlots } from "@/lib/db"
+import { initDB, getCourses, getTeachers, getSubjects, getSubjectTimeSlots, getGeneratedCourseSchedules, getGeneratedTeacherSchedules } from "@/lib/db"
 import type { Course, Teacher, Subject, SubjectTimeSlot } from "@/types"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
-import { ScheduleView } from "@/components/schedule-view" // Importamos el nuevo componente
-
-// Recuperamos los datos de los horarios generados desde localStorage
-const getGeneratedSchedules = () => {
-  if (typeof window === "undefined") {
-    return { courseSchedules: [], teacherSchedules: [] }
-  }
-  const courseSchedules = JSON.parse(localStorage.getItem("courseSchedules") || "[]")
-  const teacherSchedules = JSON.parse(localStorage.getItem("teacherSchedules") || "[]")
-  return { courseSchedules, teacherSchedules }
-}
+import { ScheduleView } from "@/components/schedule-view"
+import { AlertTriangle, CheckCircle, UserX, BookX } from "lucide-react"
 
 const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+const MAX_WEEKLY_HOURS_PER_COURSE = 40;
 
 export default function ReportsPage() {
   const [loading, setLoading] = useState(true)
   const [timeSlots, setTimeSlots] = useState<SubjectTimeSlot[]>([])
   const [courseSchedules, setCourseSchedules] = useState<any[]>([])
   const [teacherSchedules, setTeacherSchedules] = useState<any[]>([])
+  
+  // State for advanced reports
+  const [allCourses, setAllCourses] = useState<Course[]>([]);
+  const [allTeachers, setAllTeachers] = useState<Teacher[]>([]);
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       await initDB()
-      const slots = await getSubjectTimeSlots()
-      setTimeSlots(slots.sort((a, b) => a.startTime.localeCompare(b.startTime)))
-      
-      const { courseSchedules, teacherSchedules } = getGeneratedSchedules()
-      setCourseSchedules(courseSchedules)
-      setTeacherSchedules(teacherSchedules)
+      const [slots, genCourseScheds, genTeacherScheds, courses, teachers, subjects] = await Promise.all([
+        getSubjectTimeSlots(),
+        getGeneratedCourseSchedules(),
+        getGeneratedTeacherSchedules(),
+        getCourses(),
+        getTeachers(),
+        getSubjects()
+      ]);
 
+      setTimeSlots(slots.sort((a, b) => a.startTime.localeCompare(b.startTime)))
+      setCourseSchedules(genCourseScheds)
+      setTeacherSchedules(genTeacherScheds)
+      setAllCourses(courses);
+      setAllTeachers(teachers);
+      setAllSubjects(subjects);
       setLoading(false)
     }
     loadData()
   }, [])
+
+  // Memoized calculations for advanced reports
+  const advancedReports = useMemo(() => {
+    const teachersWithMissingAssignments = allTeachers.filter(t => t.subjectsTaught.length === 0 || t.subjectsTaught.every(st => !st.courseIds || st.courseIds.length === 0));
+    
+    const coursesWithMissingSubjects = allCourses.filter(c => {
+        const totalHours = c.courseSubjects.reduce((sum, cs) => sum + cs.weeklyHours, 0);
+        return totalHours < MAX_WEEKLY_HOURS_PER_COURSE;
+    });
+
+    const completeCourses = allCourses.filter(c => {
+        const totalHours = c.courseSubjects.reduce((sum, cs) => sum + cs.weeklyHours, 0);
+        return totalHours >= MAX_WEEKLY_HOURS_PER_COURSE;
+    });
+
+    const averageHours = allTeachers.length > 0
+      ? allTeachers.reduce((sum, t) => sum + t.weeklyLoad, 0) / allTeachers.length
+      : 0;
+
+    return {
+      teachersWithMissingAssignments,
+      coursesWithMissingSubjects,
+      completeCourses,
+      averageHours
+    }
+  }, [allCourses, allTeachers]);
+
 
   if (loading) {
     return (
@@ -57,12 +89,48 @@ export default function ReportsPage() {
         <SidebarTrigger className="mr-2" />
         <Separator orientation="vertical" className="mr-2 h-4" />
         <div className="flex flex-col flex-grow">
-          <h1 className="text-2xl font-bold text-gray-800 text-left">Horarios Generados</h1>
+          <h1 className="text-2xl font-bold text-gray-800 text-left">Informes y Horarios</h1>
           <p className="text-sm text-gray-600 text-left">
-            Visualiza, imprime o guarda los horarios de cursos y docentes.
+            Analiza el estado de la configuración y visualiza los horarios generados.
           </p>
         </div>
       </header>
+      
+      {/* Advanced Reports Section */}
+      <Card className="shadow-lg border-gray-100 bg-white no-print">
+        <CardHeader><CardTitle className="text-xl font-bold text-gray-800">Reportes de Estado</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Average Hours */}
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Carga Media Semanal</CardTitle></CardHeader>
+                <CardContent><div className="text-2xl font-bold">{advancedReports.averageHours.toFixed(2)}h / docente</div></CardContent>
+            </Card>
+            {/* Complete Courses */}
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Cursos Completos</CardTitle><CheckCircle className="h-4 w-4 text-green-500" /></CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold">{advancedReports.completeCourses.length}</div>
+                    <p className="text-xs text-muted-foreground">{advancedReports.completeCourses.map(c => `${c.grade}º ${c.section}`).join(', ')}</p>
+                </CardContent>
+            </Card>
+            {/* Courses with missing assignments */}
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Cursos Incompletos</CardTitle><BookX className="h-4 w-4 text-orange-500" /></CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold">{advancedReports.coursesWithMissingSubjects.length}</div>
+                     <p className="text-xs text-muted-foreground">{advancedReports.coursesWithMissingSubjects.map(c => `${c.grade}º ${c.section}`).join(', ')}</p>
+                </CardContent>
+            </Card>
+            {/* Teachers with missing assignments */}
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Docentes Sin Asignación</CardTitle><UserX className="h-4 w-4 text-red-500" /></CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold">{advancedReports.teachersWithMissingAssignments.length}</div>
+                    <p className="text-xs text-muted-foreground">{advancedReports.teachersWithMissingAssignments.map(t => t.fullName).join(', ')}</p>
+                </CardContent>
+            </Card>
+        </CardContent>
+      </Card>
 
       <div className="space-y-6">
         {courseSchedules.length === 0 && teacherSchedules.length === 0 ? (
@@ -74,26 +142,11 @@ export default function ReportsPage() {
           </Card>
         ) : (
           <>
-            {/* Horarios por Curso */}
             {courseSchedules.map((cs) => (
-              <ScheduleView
-                key={cs.courseId}
-                title={`Horario - ${cs.courseName}`}
-                schedule={cs.schedule}
-                timeSlots={timeSlots}
-                days={DAYS}
-              />
+              <ScheduleView key={cs.courseId} title={`Horario - ${cs.courseName}`} schedule={cs.schedule} timeSlots={timeSlots} days={DAYS}/>
             ))}
-            
-            {/* Horarios por Docente */}
             {teacherSchedules.map((ts) => (
-              <ScheduleView
-                key={ts.teacherId}
-                title={`Horario - ${ts.teacherName}`}
-                schedule={ts.schedule}
-                timeSlots={timeSlots}
-                days={DAYS}
-              />
+              <ScheduleView key={ts.teacherId} title={`Horario - ${ts.teacherName}`} schedule={ts.schedule} timeSlots={timeSlots} days={DAYS} />
             ))}
           </>
         )}

@@ -1,5 +1,3 @@
-// NUEVO HORARIO/app/schedule-generation/page.tsx
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -11,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Calendar, Users, BookOpen, Clock, CheckCircle, AlertTriangle, RotateCcw, Info } from "lucide-react"
-import { getCourses, getTeachers, getSubjects, getSubjectTimeSlots, getDailySchedule, initDB } from "@/lib/db"
+import { getCourses, getTeachers, getSubjects, getSubjectTimeSlots, getDailySchedule, initDB, saveGeneratedSchedules } from "@/lib/db" // Importamos saveGeneratedSchedules
 import type { Course, Teacher, Subject, SubjectTimeSlot, DailySchedule } from "@/types"
 
 interface GeneratedSchedule {
@@ -543,6 +541,10 @@ export default function ScheduleGenerationPage() {
 
       setCourseSchedules(newCourseSchedules)
       setTeacherSchedules(newTeacherSchedules)
+      
+      // *** CAMBIO IMPORTANTE: Guardamos en la base de datos ***
+      await saveGeneratedSchedules(newCourseSchedules, newTeacherSchedules);
+
       setGenerationErrors(errors)
       setGenerationWarnings(warnings)
       setGenerationSuccess(errors.length === 0)
@@ -596,6 +598,8 @@ export default function ScheduleGenerationPage() {
     setGenerationSuccess(false)
     setGenerationProgress(0)
     setGenerationStatus("")
+    // Limpiamos también la base de datos
+    saveGeneratedSchedules([], []);
   }
 
   if (loading) {
