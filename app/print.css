@@ -1,0 +1,54 @@
+/* NUEVO HORARIO/app/print.css */
+
+/* Estilos que se aplican SOLO al imprimir */
+@media print {
+  /* Oculta todo por defecto */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Muestra solo el contenedor del horario que queremos imprimir y su contenido */
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+
+  /* Asegura que el contenedor del horario ocupe toda la página */
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Estilos del encabezado de impresión (logo y título) */
+  .print-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .print-header img {
+    max-height: 100px; /* Ajusta el tamaño del logo si es necesario */
+    margin-bottom: 15px;
+  }
+
+  .print-header h2 {
+    font-size: 24px;
+    font-weight: bold;
+    color: black;
+    margin: 0;
+  }
+  
+  /* Fuerza a que cada horario se imprima en una página nueva */
+  .print-container {
+    page-break-after: always;
+  }
+
+  /* Configuración de la página */
+  @page {
+    size: letter landscape; /* Hoja tamaño carta en horizontal */
+    margin: 0.75in; /* Márgenes de la página */
+  }
+}
