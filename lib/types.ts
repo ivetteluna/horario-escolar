@@ -1,3 +1,5 @@
+// NUEVO HORARIO/lib/types.ts
+
 export type TeacherType = "fijo" | "rotacion" | "dos_niveles" | "mixto"
 
 export interface Teacher {
@@ -6,7 +8,7 @@ export interface Teacher {
   email?: string
   phone?: string
   specialty?: string
-  subjectsTaught: { subjectId: string; weeklyHoursAssigned: number }[]
+  subjectsTaught: { subjectId: string; weeklyHoursAssigned: number; courseIds: string[] }[]
   weeklyLoad: number
   restrictions: string
   teacherType: TeacherType

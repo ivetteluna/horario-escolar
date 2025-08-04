@@ -1,3 +1,5 @@
+// NUEVO HORARIO/types/index.ts
+
 export type TeacherType = "titular" | "rotacion" | "mixto"
 
 export interface Teacher {
@@ -6,7 +8,7 @@ export interface Teacher {
   email?: string // NEW: Optional email field
   phone?: string // NEW: Optional phone field
   specialty?: string // NEW: Optional specialty field
-  subjectsTaught: { subjectId: string; weeklyHoursAssigned: number; courseIds?: string[] }[]
+  subjectsTaught: { subjectId: string; weeklyHoursAssigned: number; courseIds: string[] }[]
   weeklyLoad: number // This will now be calculated
   restrictions: string // Simplified as a string for now (e.g., "Lunes 8-10 AM no disponible")
   teacherType: TeacherType
