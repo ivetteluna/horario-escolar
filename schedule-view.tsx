@@ -1,4 +1,4 @@
-// NUEVO HORARIO/components/schedule-view.tsx
+// En: NUEVO HORARIO/components/schedule-view.tsx
 
 "use client"
 
