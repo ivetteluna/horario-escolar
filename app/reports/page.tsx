@@ -5,11 +5,11 @@
 import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { initDB, getCourses, getTeachers, getSubjects, getSubjectTimeSlots, getGeneratedCourseSchedules, getGeneratedTeacherSchedules } from "@/lib/db"
-import type { Course, Teacher, Subject, SubjectTimeSlot } from "@/types"
+import type { Course, Teacher, SubjectTimeSlot } from "@/types"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { ScheduleView } from "@/components/schedule-view"
-import { AlertTriangle, CheckCircle, UserX, BookX } from "lucide-react"
+import { UserX, BookX, CheckCircle, Clock } from "lucide-react"
 
 const DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
 const MAX_WEEKLY_HOURS_PER_COURSE = 40;
@@ -23,18 +23,16 @@ export default function ReportsPage() {
   // State for advanced reports
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [allTeachers, setAllTeachers] = useState<Teacher[]>([]);
-  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
       await initDB()
-      const [slots, genCourseScheds, genTeacherScheds, courses, teachers, subjects] = await Promise.all([
+      const [slots, genCourseScheds, genTeacherScheds, courses, teachers] = await Promise.all([
         getSubjectTimeSlots(),
         getGeneratedCourseSchedules(),
         getGeneratedTeacherSchedules(),
         getCourses(),
         getTeachers(),
-        getSubjects()
       ]);
 
       setTimeSlots(slots.sort((a, b) => a.startTime.localeCompare(b.startTime)))
@@ -42,7 +40,6 @@ export default function ReportsPage() {
       setTeacherSchedules(genTeacherScheds)
       setAllCourses(courses);
       setAllTeachers(teachers);
-      setAllSubjects(subjects);
       setLoading(false)
     }
     loadData()
@@ -50,6 +47,8 @@ export default function ReportsPage() {
 
   // Memoized calculations for advanced reports
   const advancedReports = useMemo(() => {
+    if (loading) return null;
+
     const teachersWithMissingAssignments = allTeachers.filter(t => t.subjectsTaught.length === 0 || t.subjectsTaught.every(st => !st.courseIds || st.courseIds.length === 0));
     
     const coursesWithMissingSubjects = allCourses.filter(c => {
@@ -72,7 +71,7 @@ export default function ReportsPage() {
       completeCourses,
       averageHours
     }
-  }, [allCourses, allTeachers]);
+  }, [allCourses, allTeachers, loading]);
 
 
   if (loading) {
@@ -97,44 +96,33 @@ export default function ReportsPage() {
       </header>
       
       {/* Advanced Reports Section */}
-      <Card className="shadow-lg border-gray-100 bg-white no-print">
-        <CardHeader><CardTitle className="text-xl font-bold text-gray-800">Reportes de Estado</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Average Hours */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Carga Media Semanal</CardTitle></CardHeader>
-                <CardContent><div className="text-2xl font-bold">{advancedReports.averageHours.toFixed(2)}h / docente</div></CardContent>
-            </Card>
-            {/* Complete Courses */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Cursos Completos</CardTitle><CheckCircle className="h-4 w-4 text-green-500" /></CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{advancedReports.completeCourses.length}</div>
-                    <p className="text-xs text-muted-foreground">{advancedReports.completeCourses.map(c => `${c.grade}º ${c.section}`).join(', ')}</p>
-                </CardContent>
-            </Card>
-            {/* Courses with missing assignments */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Cursos Incompletos</CardTitle><BookX className="h-4 w-4 text-orange-500" /></CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{advancedReports.coursesWithMissingSubjects.length}</div>
-                     <p className="text-xs text-muted-foreground">{advancedReports.coursesWithMissingSubjects.map(c => `${c.grade}º ${c.section}`).join(', ')}</p>
-                </CardContent>
-            </Card>
-            {/* Teachers with missing assignments */}
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Docentes Sin Asignación</CardTitle><UserX className="h-4 w-4 text-red-500" /></CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{advancedReports.teachersWithMissingAssignments.length}</div>
-                    <p className="text-xs text-muted-foreground">{advancedReports.teachersWithMissingAssignments.map(t => t.fullName).join(', ')}</p>
-                </CardContent>
-            </Card>
-        </CardContent>
-      </Card>
+      {advancedReports && (
+        <Card className="shadow-lg border-gray-100 bg-white no-print">
+          <CardHeader><CardTitle className="text-xl font-bold text-gray-800">Reportes de Estado</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Carga Media Semanal</CardTitle><Clock className="h-4 w-4 text-gray-500" /></CardHeader>
+                  <CardContent><div className="text-2xl font-bold">{advancedReports.averageHours.toFixed(2)}h / docente</div></CardContent>
+              </Card>
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Cursos Completos</CardTitle><CheckCircle className="h-4 w-4 text-green-500" /></CardHeader>
+                  <CardContent><div className="text-2xl font-bold">{advancedReports.completeCourses.length}</div></CardContent>
+              </Card>
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Cursos Incompletos</CardTitle><BookX className="h-4 w-4 text-orange-500" /></CardHeader>
+                  <CardContent><div className="text-2xl font-bold">{advancedReports.coursesWithMissingSubjects.length}</div></CardContent>
+              </Card>
+              <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Docentes Sin Asignación</CardTitle><UserX className="h-4 w-4 text-red-500" /></CardHeader>
+                  <CardContent><div className="text-2xl font-bold">{advancedReports.teachersWithMissingAssignments.length}</div></CardContent>
+              </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="space-y-6">
         {courseSchedules.length === 0 && teacherSchedules.length === 0 ? (
-          <Card className="shadow-lg border-gray-100 bg-white">
+          <Card className="shadow-lg border-gray-100 bg-white no-print">
             <CardContent className="py-8 text-center text-muted-foreground">
               <p>No hay horarios generados para mostrar.</p>
               <p className="text-sm mt-2">Ve a la sección "Generar Horarios" para crearlos.</p>
