@@ -1,8 +1,10 @@
+// NUEVO HORARIO/app/layout.tsx
+
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import "./print.css" // <-- Esta es la línea que se añadió
+import "./print.css"
 import { MainNav } from "@/components/main-nav"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -12,7 +14,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "School Scheduler",
   description: "Automatic and personalized school timetable generation for teachers.",
-  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -23,13 +24,15 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
-        <MainNav /> {/* Top navigation bar */}
+        {/* Añadimos la clase no-print a los elementos que no queremos imprimir */}
+        <div className="no-print">
+          <MainNav />
+        </div>
         <SidebarProvider>
-          <AppSidebar /> {/* The actual sidebar component */}
+          <div className="no-print">
+            <AppSidebar />
+          </div>
           <SidebarInset className="bg-gradient-to-br from-blue-50 to-purple-50 pt-16">
-            {" "}
-            {/* Added pt-16 */}
-            {/* The main content area with a gradient background */}
             {children}
           </SidebarInset>
         </SidebarProvider>

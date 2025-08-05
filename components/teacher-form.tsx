@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { MultiSelect } from "@/components/multi-select"
-import { PlusCircle, XCircle } from "lucide-react"
 import type {
   Teacher,
   TeacherType,
@@ -41,11 +40,7 @@ const levels: SchoolLevel[] = ["Primario", "Secundario"]
 const grades: SchoolGrade[] = ["Primero", "Segundo", "Tercero", "Cuarto", "Quinto", "Sexto"]
 const sections: SchoolSection[] = ["A", "B", "C", "D", "E"]
 
-const getGradeOrder = (grade: SchoolGrade): number => {
-  const gradeOrder = { Primero: 1, Segundo: 2, Tercero: 3, Cuarto: 4, Quinto: 5, Sexto: 6 }
-  return gradeOrder[grade] || 0
-}
-
+const getGradeOrder = (grade: SchoolGrade): number => ({ Primero: 1, Segundo: 2, Tercero: 3, Cuarto: 4, Quinto: 5, Sexto: 6 }[grade] || 0)
 const getLevelOrder = (level: SchoolLevel): number => (level === "Primario" ? 1 : 2)
 
 export function TeacherForm({ initialData, onSave, onCancel }: TeacherFormProps) {
@@ -84,146 +79,96 @@ export function TeacherForm({ initialData, onSave, onCancel }: TeacherFormProps)
       return a.section.localeCompare(b.section)
     })
   }, [availableCourses])
-
-  const getAvailableCoursesForTeacher = useMemo(() => {
-    if (teacherType === "fijo") {
-      const homeroomCourse = availableCourses.find((c) => c.id === homeroomCourseId)
-      return homeroomCourse ? [homeroomCourse] : []
-    }
-    return sortedCourses.filter((course) => {
-      const levelMatch = qualifiedLevels.length === 0 || qualifiedLevels.includes(course.level)
-      const gradeMatch = qualifiedGrades.length === 0 || qualifiedGrades.includes(course.grade)
-      const sectionMatch = qualifiedSections.length === 0 || qualifiedSections.includes(course.section)
-      return levelMatch && gradeMatch && sectionMatch
-    })
-  }, [teacherType, homeroomCourseId, availableCourses, sortedCourses, qualifiedLevels, qualifiedGrades, qualifiedSections])
-
+  
   const calculateHoursForCourses = (subjectId: string, courseIds: string[]): number => {
     const subject = availableSubjects.find((s) => s.id === subjectId)
     if (!subject || !subject.weeklyHoursByLevelAndGrade) return 0
-    let totalHours = 0
-    courseIds.forEach((courseId) => {
+    return courseIds.reduce((totalHours, courseId) => {
       const course = availableCourses.find((c) => c.id === courseId)
-      if (course) {
-        const hours = subject.weeklyHoursByLevelAndGrade?.[course.level]?.[course.grade] || 0
-        totalHours += hours
-      }
-    })
-    return totalHours
+      return totalHours + (course ? subject.weeklyHoursByLevelAndGrade?.[course.level]?.[course.grade] || 0 : 0)
+    }, 0)
   }
 
-  const weeklyLoad = useMemo(() => {
-    return assignedSubjects.reduce((sum, as) => sum + Number(as.weeklyHoursAssigned || 0), 0)
-  }, [assignedSubjects])
+  // INTELIGENCIA PARA DOCENTE FIJO
+  useEffect(() => {
+    if (teacherType === "fijo" && homeroomCourseId) {
+      setAssignedSubjects(prevSubjects =>
+        prevSubjects.map(subject => ({
+          ...subject,
+          courseIds: [homeroomCourseId],
+          weeklyHoursAssigned: calculateHoursForCourses(subject.subjectId, [homeroomCourseId])
+        }))
+      );
+    }
+  }, [teacherType, homeroomCourseId]);
 
-  const handleAssignedSubjectsChange = (subjectId: string, courseIds: string[]) => {
-    setAssignedSubjects((prev) => {
-      const existingSubject = prev.find((s) => s.subjectId === subjectId)
-      if (existingSubject) {
-        // Update existing subject's courses
-        const updated = prev.map((s) => {
-          if (s.subjectId === subjectId) {
-            const weeklyHoursAssigned = calculateHoursForCourses(subjectId, courseIds)
-            return { ...s, courseIds, weeklyHoursAssigned }
-          }
-          return s
-        })
-        // Filter out subjects with no courses
-        return updated.filter(s => s.courseIds.length > 0)
-      } else {
-        // Add new subject
-        const weeklyHoursAssigned = calculateHoursForCourses(subjectId, courseIds)
-        if (courseIds.length > 0) {
-          return [...prev, { subjectId, courseIds, weeklyHoursAssigned }]
-        }
-        return prev
-      }
-    })
-  }
-  
+
+  const weeklyLoad = useMemo(() => assignedSubjects.reduce((sum, as) => sum + as.weeklyHoursAssigned, 0), [assignedSubjects]);
+
   const handleSelectedSubjectsChange = (selectedSubjectIds: string[]) => {
     const newAssignedSubjects = selectedSubjectIds.map(id => {
-        const existing = assignedSubjects.find(s => s.subjectId === id);
-        return existing || { subjectId: id, courseIds: [], weeklyHoursAssigned: 0 };
+      const existing = assignedSubjects.find(s => s.subjectId === id);
+      const courseIds = (teacherType === 'fijo' && homeroomCourseId) ? [homeroomCourseId] : (existing?.courseIds || []);
+      const weeklyHoursAssigned = calculateHoursForCourses(id, courseIds);
+      return { subjectId: id, courseIds, weeklyHoursAssigned };
     });
     setAssignedSubjects(newAssignedSubjects);
   };
 
+  const handleCourseSelectionForSubject = (subjectId: string, courseIds: string[]) => {
+    setAssignedSubjects(prev => prev.map(subject => 
+        subject.subjectId === subjectId 
+        ? { ...subject, courseIds, weeklyHoursAssigned: calculateHoursForCourses(subjectId, courseIds) } 
+        : subject
+    ));
+  };
+  
+  const getAvailableCoursesForTeacher = useMemo(() => {
+    if (teacherType === "fijo") return availableCourses.filter(c => c.id === homeroomCourseId);
+    return sortedCourses.filter(c => 
+      (qualifiedLevels.length === 0 || qualifiedLevels.includes(c.level)) &&
+      (qualifiedGrades.length === 0 || qualifiedGrades.includes(c.grade)) &&
+      (qualifiedSections.length === 0 || qualifiedSections.includes(c.section))
+    );
+  }, [teacherType, homeroomCourseId, sortedCourses, qualifiedLevels, qualifiedGrades, qualifiedSections]);
+  
+  // ... (resto del componente sin cambios hasta el return)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const errors: string[] = []
     if (!fullName.trim()) errors.push("El nombre completo del docente es obligatorio.")
-    if (assignedSubjects.length === 0) errors.push("El docente debe tener al menos una asignatura asignada.")
-    assignedSubjects.forEach((as, index) => {
-      if (!as.subjectId) errors.push(`Por favor, selecciona una asignatura para la asignación en la fila ${index + 1}.`)
-      if (as.courseIds.length === 0) errors.push(`Por favor, selecciona al menos un curso para la asignatura en la fila ${index + 1}.`)
-      if (Number(as.weeklyHoursAssigned) <= 0) errors.push(`Las horas semanales asignadas para la asignatura en la fila ${index + 1} deben ser mayores que 0.`)
-    })
-    if ((teacherType === "rotacion" || teacherType === "dos_niveles" || teacherType === "mixto")) {
-      if (qualifiedLevels.length === 0) errors.push("Por favor, selecciona al menos un nivel en el que el docente esté calificado.")
-      if (qualifiedGrades.length === 0) errors.push("Por favor, selecciona al menos un grado en el que el docente esté calificado.")
-      if (qualifiedSections.length === 0) errors.push("Por favor, selecciona al menos una sección en la que el docente esté calificado.")
-    }
     if ((teacherType === "fijo" || teacherType === "mixto") && !homeroomCourseId) errors.push("Por favor, selecciona el curso del cual este docente es titular.")
+    
+    assignedSubjects.forEach((as) => {
+      if (as.courseIds.length === 0) {
+        const subjectName = availableSubjects.find(s => s.id === as.subjectId)?.name || "una asignatura";
+        errors.push(`Por favor, selecciona al menos un curso para ${subjectName}.`)
+      }
+    })
+
     setFormErrors(errors)
     if (errors.length > 0) return
 
     const newTeacher: Teacher = {
       id: initialData?.id || uuidv4(),
-      fullName,
-      email,
-      phone,
-      specialty,
-      subjectsTaught: assignedSubjects.map((as) => ({
-        subjectId: as.subjectId,
-        weeklyHoursAssigned: Number(as.weeklyHoursAssigned),
-        courseIds: as.courseIds,
-      })),
-      weeklyLoad,
-      restrictions,
-      teacherType,
-      qualifiedLevels: teacherType === "fijo" ? [] : qualifiedLevels,
-      qualifiedGrades: teacherType === "fijo" ? [] : qualifiedGrades,
-      qualifiedSections: teacherType === "fijo" ? [] : qualifiedSections,
-      homeroomCourseId: teacherType === "fijo" || teacherType === "mixto" ? homeroomCourseId : undefined,
+      fullName, email, phone, specialty, restrictions, teacherType, homeroomCourseId,
+      subjectsTaught: assignedSubjects, weeklyLoad, qualifiedLevels, qualifiedGrades, qualifiedSections,
     }
     onSave(newTeacher)
   }
 
-  const allNameOptions = useMemo(() => {
-    const options = [...predefinedNames]
-    if (fullName && !predefinedNames.some((n) => n.name === fullName)) {
-      options.push({ id: "current-temp", name: fullName })
-    }
-    return options.sort((a, b) => a.name.localeCompare(b.name))
-  }, [fullName, predefinedNames])
-
-  const getTeacherTypeLabel = (type: TeacherType) => ({
-    fijo: "Docente Fijo (Aula Fija)",
-    rotacion: "Docente de Rotación",
-    dos_niveles: "Docente de Dos Niveles",
-    mixto: "Docente Mixto (Titular y Rotación)",
-  }[type] || type)
-
-  const getTeacherTypeDescription = (type: TeacherType) => ({
-    fijo: "Docente que permanece en un aula fija y es titular de un curso específico.",
-    rotacion: "Docente que rota entre diferentes aulas y cursos para impartir su(s) asignatura(s).",
-    dos_niveles: "Docente que imparte clases en dos niveles educativos diferentes.",
-    mixto: "Docente que es titular de un curso pero también rota para impartir asignaturas en otros cursos.",
-  }[type] || "")
-
   return (
     <form onSubmit={handleSubmit} className="grid gap-6 p-6 bg-white rounded-lg shadow-sm">
-      <h2 className="text-2xl font-semibold text-gray-800">{initialData ? "Editar Docente" : "Añadir Nuevo Docente"}</h2>
-      
-      {/* Personal Info */}
+        {/* ... (código de los campos de información personal y tipo de docente sin cambios) ... */}
+        <h2 className="text-2xl font-semibold text-gray-800">{initialData ? "Editar Docente" : "Añadir Nuevo Docente"}</h2>
+        {/* Personal Info */}
       <div className="grid gap-2">
         <Label htmlFor="fullName">Nombre Completo</Label>
         <Select value={fullName} onValueChange={setFullName}>
           <SelectTrigger id="fullName"><SelectValue placeholder="Seleccionar o añadir nombre" /></SelectTrigger>
           <SelectContent>
-            {allNameOptions.map((nameItem) => (<SelectItem key={nameItem.id} value={nameItem.name}>{nameItem.name}</SelectItem>))}
+            {predefinedNames.sort((a, b) => a.name.localeCompare(b.name)).map((nameItem) => (<SelectItem key={nameItem.id} value={nameItem.name}>{nameItem.name}</SelectItem>))}
           </SelectContent>
         </Select>
       </div>
@@ -233,44 +178,42 @@ export function TeacherForm({ initialData, onSave, onCancel }: TeacherFormProps)
       </div>
       <div className="grid gap-2"><Label htmlFor="specialty">Especialidad</Label><Input id="specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ej. Educación Básica, Ciencias" /></div>
 
-      {/* Teacher Type and Qualifications */}
-      <div className="grid gap-2">
+       {/* Teacher Type and Qualifications */}
+       <div className="grid gap-2">
         <Label htmlFor="teacherType">Tipo de Docente</Label>
         <Select value={teacherType} onValueChange={(value: TeacherType) => setTeacherType(value)}>
-          <SelectTrigger id="teacherType"><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
+          <SelectTrigger id="teacherType"><SelectValue/></SelectTrigger>
           <SelectContent>
-            <SelectItem value="fijo">{getTeacherTypeLabel("fijo")}</SelectItem>
-            <SelectItem value="rotacion">{getTeacherTypeLabel("rotacion")}</SelectItem>
-            <SelectItem value="dos_niveles">{getTeacherTypeLabel("dos_niveles")}</SelectItem>
-            <SelectItem value="mixto">{getTeacherTypeLabel("mixto")}</SelectItem>
+            <SelectItem value="fijo">Docente Fijo (Aula Fija)</SelectItem>
+            <SelectItem value="rotacion">Docente de Rotación</SelectItem>
+            <SelectItem value="dos_niveles">Docente de Dos Niveles</SelectItem>
+            <SelectItem value="mixto">Docente Mixto (Titular y Rotación)</SelectItem>
           </SelectContent>
         </Select>
-        <p className="text-sm text-muted-foreground">{getTeacherTypeDescription(teacherType)}</p>
       </div>
       {(teacherType === "fijo" || teacherType === "mixto") && (
         <div className="grid gap-2">
           <Label htmlFor="homeroomCourse">Curso Titular</Label>
           <Select value={homeroomCourseId} onValueChange={setHomeroomCourseId}>
-            <SelectTrigger id="homeroomCourse"><SelectValue placeholder="Seleccionar curso del cual es titular" /></SelectTrigger>
+            <SelectTrigger id="homeroomCourse"><SelectValue placeholder="Seleccionar curso" /></SelectTrigger>
             <SelectContent>
               {sortedCourses.map((course) => (<SelectItem key={course.id} value={course.id}>{course.level} {course.grade}º {course.section}</SelectItem>))}
             </SelectContent>
           </Select>
         </div>
       )}
-      {(teacherType === "rotacion" || teacherType === "dos_niveles" || teacherType === "mixto") && (
+       {(teacherType === "rotacion" || teacherType === "dos_niveles" || teacherType === "mixto") && (
         <Card className="w-full shadow-sm"><CardContent className="p-4">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">Calificaciones del Docente</h3>
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">Calificaciones del Docente de Rotación</h3>
           <div className="grid gap-4">
-            <div className="grid gap-2"><Label htmlFor="qualifiedLevels">Niveles Calificados</Label><MultiSelect options={levels.map(l => ({label: l, value: l}))} selected={qualifiedLevels} onSelectedChange={v => setQualifiedLevels(v as SchoolLevel[])} placeholder="Seleccionar niveles" /></div>
-            <div className="grid gap-2"><Label htmlFor="qualifiedGrades">Grados Calificados</Label><MultiSelect options={grades.map(g => ({label: g, value: g}))} selected={qualifiedGrades} onSelectedChange={v => setQualifiedGrades(v as SchoolGrade[])} placeholder="Seleccionar grados" /></div>
-            <div className="grid gap-2"><Label htmlFor="qualifiedSections">Secciones Calificadas</Label><MultiSelect options={sections.map(s => ({label: s, value: s}))} selected={qualifiedSections} onSelectedChange={v => setQualifiedSections(v as SchoolSection[])} placeholder="Seleccionar secciones" /></div>
+            <div className="grid gap-2"><Label>Niveles</Label><MultiSelect options={levels.map(l => ({label: l, value: l}))} selected={qualifiedLevels} onSelectedChange={v => setQualifiedLevels(v as SchoolLevel[])} /></div>
+            <div className="grid gap-2"><Label>Grados</Label><MultiSelect options={grades.map(g => ({label: g, value: g}))} selected={qualifiedGrades} onSelectedChange={v => setQualifiedGrades(v as SchoolGrade[])} /></div>
+            <div className="grid gap-2"><Label>Secciones</Label><MultiSelect options={sections.map(s => ({label: s, value: s}))} selected={qualifiedSections} onSelectedChange={v => setQualifiedSections(v as SchoolSection[])} /></div>
           </div>
         </CardContent></Card>
       )}
 
-      {/* NEW: Improved Subject Assignment */}
-      <Card className="w-full shadow-sm border-gray-100">
+      <Card className="w-full shadow-sm">
         <CardContent className="p-4">
           <h3 className="text-xl font-semibold text-gray-800 mb-4">Asignación de Asignaturas y Cursos</h3>
           <div className="grid gap-2 mb-4">
@@ -283,30 +226,37 @@ export function TeacherForm({ initialData, onSave, onCancel }: TeacherFormProps)
             />
           </div>
 
-          {assignedSubjects.length > 0 && (
+          {assignedSubjects.length > 0 && teacherType !== 'fijo' && (
             <div className="grid gap-4 mt-4 border-t pt-4">
+                <p className="text-sm text-muted-foreground">Ahora, especifica en qué cursos se impartirá cada asignatura.</p>
               {assignedSubjects.map((assignment) => (
                 <div key={assignment.subjectId} className="grid gap-2">
                   <Label className="font-semibold">{availableSubjects.find(s => s.id === assignment.subjectId)?.name}</Label>
                   <MultiSelect
                     options={getAvailableCoursesForTeacher.map(c => ({ label: `${c.level} ${c.grade}º ${c.section}`, value: c.id }))}
                     selected={assignment.courseIds}
-                    onSelectedChange={(values) => handleAssignedSubjectsChange(assignment.subjectId, values)}
+                    onSelectedChange={(values) => handleCourseSelectionForSubject(assignment.subjectId, values)}
                     placeholder="Seleccionar cursos para esta asignatura"
                   />
                 </div>
               ))}
             </div>
           )}
+
+           {assignedSubjects.length > 0 && teacherType === 'fijo' && (
+             <div className="text-sm p-3 bg-emerald-50 text-emerald-800 rounded-md">
+                Las asignaturas se asignarán automáticamente al curso titular: {courses.find(c => c.id === homeroomCourseId)?.grade || ''}º {courses.find(c => c.id === homeroomCourseId)?.section || ''}
+            </div>
+           )}
         </CardContent>
       </Card>
-
-      {/* Weekly Load and Restrictions */}
-      <div className="grid gap-2"><Label htmlFor="weeklyLoad">Carga Horaria Semanal Total (Calculada)</Label><Input id="weeklyLoad" value={weeklyLoad} readOnly /></div>
-      <div className="grid gap-2"><Label htmlFor="restrictions">Restricciones Personales</Label><Textarea id="restrictions" value={restrictions} onChange={(e) => setRestrictions(e.target.value)} placeholder="Ej. Lunes 8-10 AM no disponible" /></div>
       
-      {/* Errors and Actions */}
-      {formErrors.length > 0 && (<div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md"><p className="font-semibold mb-2">Errores:</p><ul className="list-disc list-inside">{formErrors.map((error, index) => (<li key={index}>{error}</li>))}</ul></div>)}
+      {/* Carga Horaria y Restricciones */}
+      <div className="grid gap-2"><Label>Carga Horaria Semanal Total (Calculada)</Label><Input value={weeklyLoad} readOnly /></div>
+      <div className="grid gap-2"><Label>Restricciones Personales</Label><Textarea value={restrictions} onChange={(e) => setRestrictions(e.target.value)} placeholder="Ej. Lunes 8-10 AM no disponible" /></div>
+
+       {/* Errors and Actions */}
+      {formErrors.length > 0 && (<div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md"><ul className="list-disc list-inside">{formErrors.map((error, index) => (<li key={index}>{error}</li>))}</ul></div>)}
       <div className="flex justify-end gap-3 mt-4">
         <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
         <Button type="submit">{initialData ? "Guardar Cambios" : "Añadir Docente"}</Button>
