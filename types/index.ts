@@ -1,79 +1,81 @@
 // NUEVO HORARIO/types/index.ts
 
+// NUEVA INTERFAZ PARA RESTRICCIONES
+export interface Restriction {
+  id: string;
+  day: "Lunes" | "Martes" | "Miércoles" | "Jueves" | "Viernes";
+  startTime: string;
+  endTime: string;
+  reason: string;
+}
+
 export type TeacherType = "titular" | "rotacion" | "mixto"
 
 export interface Teacher {
   id: string
   fullName: string
-  email?: string // NEW: Optional email field
-  phone?: string // NEW: Optional phone field
-  specialty?: string // NEW: Optional specialty field
+  email?: string
+  phone?: string
+  specialty?: string
   subjectsTaught: { subjectId: string; weeklyHoursAssigned: number; courseIds: string[] }[]
-  weeklyLoad: number // This will now be calculated
-  restrictions: string // Simplified as a string for now (e.g., "Lunes 8-10 AM no disponible")
+  weeklyLoad: number
+  restrictions: Restriction[] // CAMBIADO de string a Restriction[]
   teacherType: TeacherType
-  qualifiedLevels: SchoolLevel[] // NEW: Levels the teacher is qualified to teach in
-  qualifiedGrades: SchoolGrade[] // NEW: Grades the teacher is qualified to teach in
-  qualifiedSections: SchoolSection[] // NEW: Sections the teacher is qualified to teach in
-  homeroomCourseId?: string // NEW: Course ID for homeroom teachers
+  qualifiedLevels: SchoolLevel[]
+  qualifiedGrades: SchoolGrade[]
+  qualifiedSections: SchoolSection[]
+  homeroomCourseId?: string
 }
 
+// ... (El resto del archivo sigue igual, no necesitas cambiar nada más aquí)
 export interface SchoolSettings {
-  id: string // Will be a fixed ID like 'school_settings'
+  id: string
   schoolName: string
-  logoUrl: string // URL to the logo image
+  logoUrl: string
 }
-
 export interface BreakTime {
   name: string
-  startTime: string // e.g., "13:00"
-  endTime: string // e.g., "14:00"
+  startTime: string
+  endTime: string
 }
-
 export interface DailySchedule {
-  id: string // Will be a fixed ID like 'daily_schedule'
-  schoolStartTime: string // e.g., "08:00"
-  schoolEndTime: string // e.g., "17:00"
+  id: string
+  schoolStartTime: string
+  schoolEndTime: string
   breaks: BreakTime[]
 }
-
 export type SchoolLevel = "Primario" | "Secundario"
 export type SchoolGrade = "Primero" | "Segundo" | "Tercero" | "Cuarto" | "Quinto" | "Sexto"
 export type SchoolSection = "A" | "B" | "C" | "D" | "E"
-
 export interface Subject {
   id: string
   name: string
-  shortCode?: string // NEW: for "LE", "M", "CN" etc.
+  shortCode?: string
   priority: "alta" | "media" | "baja"
-  iconColor: string // Hex color for the icon
-  iconName: string // e.g., "book", "flask" (from Lucide React)
-  weeklyHours?: number // NEW: Default weekly hours for this subject
+  iconColor: string
+  iconName: string
+  weeklyHours?: number
   weeklyHoursByLevelAndGrade?: {
     [level in SchoolLevel]?: {
-      [grade in SchoolGrade]?: number // Hours for this subject at this level and grade
+      [grade in SchoolGrade]?: number
     }
   }
 }
-
 export interface SubjectTimeSlot {
   id: string
-  name: string // e.g., "Bloque 1", "Primera Hora"
-  startTime: string // e.g., "08:00"
-  endTime: string // e.g., "08:45"
+  name: string
+  startTime: string
+  endTime: string
 }
-
 export interface Course {
   id: string
   level: SchoolLevel
   grade: SchoolGrade
   section: SchoolSection
-  studentList: string // Carga de listas de estudiantes (simplificado como string por ahora)
-  homeroomTeacherId: string // ID del docente titular
-  courseSubjects: { subjectId: string; weeklyHours: number }[] // NEW: Subjects and their hours for this specific course
+  studentList: string
+  homeroomTeacherId: string
+  courseSubjects: { subjectId: string; weeklyHours: number }[]
 }
-
-// NEW: Predefined teacher names for selection
 export interface PredefinedTeacherName {
   id: string
   name: string
