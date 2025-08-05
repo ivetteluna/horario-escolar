@@ -1,18 +1,11 @@
 /* NUEVO HORARIO/app/print.css */
 
 @media print {
-  /* Oculta los elementos que marcamos como no-imprimibles */
-  .no-print {
-    display: none !important;
-  }
-
-  /* Asegura que el cuerpo no tenga relleno innecesario */
   body {
-    padding: 0 !important;
-    margin: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-
-  /* Estilos del encabezado de impresión (logo y título) */
+  
   .print-header {
     display: flex;
     flex-direction: column;
@@ -20,25 +13,32 @@
     margin-bottom: 20px;
     text-align: center;
   }
-
+  
   .print-header img {
     max-height: 80px;
-    margin-bottom: 10px;
-  }
-
-  .print-header h2 {
-    font-size: 22px;
-    font-weight: bold;
-    color: black;
-    margin: 0;
+    margin-bottom: 15px;
   }
   
-  /* Fuerza a que cada horario se imprima en una página nueva */
-  .print-container {
-    page-break-after: always;
+  .print-header h2, .print-header h3 {
+    margin: 0;
+    color: black;
+  }
+  
+  /* Tabla de impresión */
+  .printable-area table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px; /* Tamaño de letra más pequeño para que quepa todo */
+  }
+  .printable-area th, .printable-area td {
+    border: 1px solid #ccc;
+    padding: 4px;
+    text-align: center;
+  }
+  .printable-area th {
+    background-color: #f2f2f2 !important;
   }
 
-  /* Configuración de la página */
   @page {
     size: letter landscape;
     margin: 0.5in;
