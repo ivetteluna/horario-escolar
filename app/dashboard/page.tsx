@@ -1,3 +1,5 @@
+// NUEVO HORARIO/app/dashboard/page.tsx
+
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
