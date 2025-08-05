@@ -1,10 +1,12 @@
+// NUEVO HORARIO/app/page.tsx
+
 "use client"
 
 import { useState, useEffect } from "react"
 import { TeacherForm } from "@/components/teacher-form"
 import { TeacherList } from "@/components/teacher-list"
 import { addTeacher, getTeachers, updateTeacher, deleteTeacher, initDB } from "@/lib/db"
-import type { Teacher } from "@/types"
+import type { Teacher } from "@/lib/types" // <-- CAMBIO IMPORTANTE
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SidebarTrigger } from "@/components/ui/sidebar"
